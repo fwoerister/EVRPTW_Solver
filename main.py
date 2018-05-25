@@ -80,7 +80,7 @@ def main():
     with open('ex1_result_1126205.csv', 'w') as result_file:
         result_file.writelines('testcase;distance;runtime (in ms)\n')
         for r in test_case_statistics:
-            result_file.write('{0} & {1} & {2} \\\\ \n'.format(r[0], r[1], r[2]))
+            result_file.write('{0};{1};{2}\n'.format(r[0], r[1], r[2]))
 
 
 if __name__ == "__main__":
