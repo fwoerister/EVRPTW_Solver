@@ -1,5 +1,6 @@
 from os import listdir
 
+from evrptw_route_visualizer import RouteVisualizer
 from routing_problem_solver import RoutingProblemSolver, RoutingProblemConfiguration
 from targets import Target, CharingStation, Customer
 
@@ -62,6 +63,13 @@ def write_solution_to_file(file, distance, routes):
             f.write('\n')
 
 
+def write_solution_stats_to_file(file,stat):
+    with open(file, 'w') as result_file:
+        result_file.writelines('testcase;distance;runtime (in ms)\n')
+        for r in stat:
+            result_file.write('{0} ; {1} ; {2}\n'.format(r[0], r[1], r[2]))
+
+
 def main():
     test_case_statistics = []
 
@@ -77,10 +85,10 @@ def main():
 
             test_case_statistics.append((file, round(rps.calculate_total_distance(),3), runtime))
 
-    with open('ex1_result_1126205.csv', 'w') as result_file:
-        result_file.writelines('testcase;distance;runtime (in ms)\n')
-        for r in test_case_statistics:
-            result_file.write('{0};{1};{2}\n'.format(r[0], r[1], r[2]))
+        write_solution_stats_to_file('ex1_result_1126205.csv',test_case_statistics)
+
+    visualizer = RouteVisualizer(rps)
+    visualizer.plot()
 
 
 if __name__ == "__main__":
