@@ -168,16 +168,17 @@ class RoutingProblemSolver:
         last_position = self.depot
         self.giant_route = []
         while len(self.giant_route) != len(self.customers):
-            nearest_neighbor_dist = sys.maxsize
-            nearest_neighbor = None
+            possible_successors = [n for n in self.customers if n not in self.giant_route]
+            possible_successors.sort(key=lambda n:n.distance_to(last_position))
 
-            for c in self.customers:
-                if c not in self.giant_route and c.distance_to(last_position) < nearest_neighbor_dist:
-                    nearest_neighbor = c
-                    nearest_neighbor_dist = c.distance_to(last_position)
+            if len(possible_successors) > 5:
+                successor = min(possible_successors[:6], key=lambda n:n.due_date)
+                self.giant_route.append(successor)
+            else:
+                successor = min(possible_successors, key=lambda n: n.due_date)
+                self.giant_route.append(successor)
 
-            self.giant_route.append(nearest_neighbor)
-            last_position = nearest_neighbor
+            last_position = successor
 
     def generate_feasible_route_from_to(self, from_route, to_station):
         from_route.route.append(to_station)

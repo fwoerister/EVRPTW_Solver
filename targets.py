@@ -13,6 +13,9 @@ class Target:
     def distance_to(self, compared_target):
         return m.sqrt((self.x - compared_target.x) ** 2 + (self.y - compared_target.y) ** 2)
 
+    def get_coordinates(self):
+        return self.x, self.y
+
     def __str__(self):
         return "type: {0}, id: {1}, x: {2}, y: {3}".format(type(self), self.id, self.x, self.y)
 
