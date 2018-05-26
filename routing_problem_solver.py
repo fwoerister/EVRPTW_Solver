@@ -163,6 +163,7 @@ class RoutingProblemSolver:
 
         self.giant_route = None
         self.routes = None
+        self.n_size=1
 
     def generate_giant_route(self):
         last_position = self.depot
@@ -171,8 +172,8 @@ class RoutingProblemSolver:
             possible_successors = [n for n in self.customers if n not in self.giant_route]
             possible_successors.sort(key=lambda n:n.distance_to(last_position))
 
-            if len(possible_successors) > 5:
-                successor = min(possible_successors[:6], key=lambda n:n.due_date)
+            if len(possible_successors) >= self.n_size:
+                successor = min(possible_successors[:self.n_size], key=lambda n:n.due_date)
                 self.giant_route.append(successor)
             else:
                 successor = min(possible_successors, key=lambda n: n.due_date)

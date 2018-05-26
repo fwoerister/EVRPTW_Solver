@@ -73,22 +73,25 @@ def write_solution_stats_to_file(file,stat):
 def main():
     test_case_statistics = []
 
-    for file in listdir('problem_instances/'):
-        if file.endswith('.txt'):
-            print('solve {0}'.format(file))
-            rps = parse_input('problem_instances/{0}'.format(file))
+    for n_size in range(1,11):
+        total_dist = []
+        for file in listdir('problem_instances/'):
+            if file.endswith('.txt'):
+                # print('solve {0}'.format(file))
+                rps = parse_input('problem_instances/{0}'.format(file))
+                rps.n_size=n_size
+                runtime = round(timeit.timeit(rps.solve, number=1) * 1000, 3)
 
-            runtime = round(timeit.timeit(rps.solve, number=1) * 1000, 3)
+                write_solution_to_file('problem_solutions/solution_{0}'.format(file), rps.calculate_total_distance(),
+                                       rps.routes)
 
-            write_solution_to_file('problem_solutions/solution_{0}'.format(file), rps.calculate_total_distance(),
-                                   rps.routes)
+                test_case_statistics.append((file, round(rps.calculate_total_distance(),3), runtime))
+            total_dist.append(rps.calculate_total_distance())
+            write_solution_stats_to_file('ex1_result_1126205.csv',test_case_statistics)
 
-            test_case_statistics.append((file, round(rps.calculate_total_distance(),3), runtime))
-
-        write_solution_stats_to_file('ex1_result_1126205.csv',test_case_statistics)
-
-    visualizer = RouteVisualizer(rps)
-    visualizer.plot()
+        visualizer = RouteVisualizer(rps)
+        visualizer.plot()
+        print('total dist for {0}:\t sum:{1}\t min:{2}\t max:{3}'.format(n_size, round(sum(total_dist),1), round(min(total_dist),1), round(max(total_dist), 1)))
 
 
 if __name__ == "__main__":
