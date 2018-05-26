@@ -5,7 +5,7 @@ from routing_problem_solver import RoutingProblemSolver, RoutingProblemConfigura
 from targets import Target, CharingStation, Customer
 
 import timeit
-
+import numpy as np
 
 def parse_input(file):
     with open(file) as f:
@@ -77,7 +77,6 @@ def main():
         total_dist = []
         for file in listdir('problem_instances/'):
             if file.endswith('.txt'):
-                # print('solve {0}'.format(file))
                 rps = parse_input('problem_instances/{0}'.format(file))
                 rps.n_size=n_size
                 runtime = round(timeit.timeit(rps.solve, number=1) * 1000, 3)
@@ -91,7 +90,7 @@ def main():
 
         visualizer = RouteVisualizer(rps)
         visualizer.plot()
-        print('total dist for {0}:\t sum:{1}\t min:{2}\t max:{3}'.format(n_size, round(sum(total_dist),1), round(min(total_dist),1), round(max(total_dist), 1)))
+        print('total dist for {0}:\t sum:{1}\t avg:{2}\t min:{3}\t max:{4}'.format(n_size, round(sum(total_dist),1), round(np.mean(total_dist),1), round(min(total_dist),1), round(max(total_dist), 1)))
 
 
 if __name__ == "__main__":

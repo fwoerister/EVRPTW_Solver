@@ -152,6 +152,23 @@ class Route:
                     self.route.reverse()
                 return t
 
+    def __str__(self):
+        route_str = '['
+
+        for t in self.route:
+            route_str += t.id+', '
+
+        route_str+=']'
+        return route_str
+
+    def __repr__(self):
+        route_str = '['
+
+        for t in self.route:
+            route_str += t.id + ', '
+
+        route_str += ']'
+        return route_str
 
 class RoutingProblemSolver:
     def __init__(self, depot, charging_stations, customers, config):
@@ -213,6 +230,8 @@ class RoutingProblemSolver:
 
                 from_route.route.append(best_station)
                 from_route.route.append(to_station)
+            else:
+                return None
 
             if not from_route.is_feasible():
                 from_route.route.pop()
