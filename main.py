@@ -6,6 +6,7 @@ from targets import Target, CharingStation, Customer
 
 import timeit
 import numpy as np
+import matplotlib.pyplot as plt
 
 def parse_input(file):
     with open(file) as f:
@@ -66,31 +67,33 @@ def write_solution_to_file(file, distance, routes):
 def write_solution_stats_to_file(file,stat):
     with open(file, 'w') as result_file:
         result_file.writelines('testcase;distance;runtime (in ms)\n')
+        print('testcase & distance & runtime (in ms)\\\\')
         for r in stat:
             result_file.write('{0} ; {1} ; {2}\n'.format(r[0], r[1], r[2]))
+            print('{0} & {1} & {2}\\\\'.format(r[0], r[1], r[2]))
 
 
 def main():
     test_case_statistics = []
 
-    for n_size in range(1,11):
-        total_dist = []
-        for file in listdir('problem_instances/'):
-            if file.endswith('.txt'):
-                rps = parse_input('problem_instances/{0}'.format(file))
-                rps.n_size=n_size
-                runtime = round(timeit.timeit(rps.solve, number=1) * 1000, 3)
+    for file in listdir('problem_instances/'):
+        if file.endswith('.txt'):
+            rps = parse_input('problem_instances/{0}'.format(file))
+            rps.tolerance = 1.5
 
-                write_solution_to_file('problem_solutions/solution_{0}'.format(file), rps.calculate_total_distance(),
-                                       rps.routes)
+            runtime = round(timeit.timeit(rps.solve_with_shortest_path, number=1) * 1000, 3)
+            # runtime = round(timeit.timeit(rps.solve, number=1) * 1000, 3)
 
-                test_case_statistics.append((file, round(rps.calculate_total_distance(),3), runtime))
-            total_dist.append(rps.calculate_total_distance())
-            write_solution_stats_to_file('ex1_result_1126205.csv',test_case_statistics)
+            write_solution_to_file('problem_solutions/solution_{0}'.format(file), rps.calculate_total_distance(),
+                                   rps.routes)
 
-        visualizer = RouteVisualizer(rps)
-        visualizer.plot()
-        print('total dist for {0}:\t sum:{1}\t avg:{2}\t min:{3}\t max:{4}'.format(n_size, round(sum(total_dist),1), round(np.mean(total_dist),1), round(min(total_dist),1), round(max(total_dist), 1)))
+            test_case_statistics.append((file, round(rps.calculate_total_distance(), 3), runtime))
+    test_case_statistics.sort(key=lambda x: x[0])
+    write_solution_stats_to_file('ex1_result_1126205.csv', test_case_statistics)
+
+    print(np.mean([x[1] for x in test_case_statistics]))
+    print(min([x[1] for x in test_case_statistics]))
+    print(max([x[1] for x in test_case_statistics]))
 
 
 if __name__ == "__main__":

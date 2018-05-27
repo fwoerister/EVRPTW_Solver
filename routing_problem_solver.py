@@ -1,7 +1,9 @@
 import sys
+import numpy as np
 
+from shortest_path_solver import ShortestPathSolver
 from targets import CharingStation, Customer
-
+from heapq import heappush, heappop
 
 class RoutingProblemConfiguration:
     def __init__(self, tank_capacity, payload_capacity, fuel_consumption_rate, charging_rate, velocity):
@@ -156,9 +158,9 @@ class Route:
         route_str = '['
 
         for t in self.route:
-            route_str += t.id+', '
+            route_str += t.id + ', '
 
-        route_str+=']'
+        route_str += ']'
         return route_str
 
     def __repr__(self):
@@ -170,6 +172,7 @@ class Route:
         route_str += ']'
         return route_str
 
+
 class RoutingProblemSolver:
     def __init__(self, depot, charging_stations, customers, config):
         self.depot = depot
@@ -180,17 +183,23 @@ class RoutingProblemSolver:
 
         self.giant_route = None
         self.routes = None
-        self.n_size=1
+        self.n_size = 3
+        self.tolerance = 1
 
     def generate_giant_route(self):
         last_position = self.depot
         self.giant_route = []
         while len(self.giant_route) != len(self.customers):
             possible_successors = [n for n in self.customers if n not in self.giant_route]
-            possible_successors.sort(key=lambda n:n.distance_to(last_position))
+            nearest_distance = min(possible_successors, key=lambda x: x.distance_to(last_position)).distance_to(
+                last_position)
+            possible_successors = [n for n in possible_successors if
+                                   n.distance_to(last_position) <= nearest_distance * self.tolerance]
+
+            possible_successors.sort(key=lambda n: n.distance_to(last_position))
 
             if len(possible_successors) >= self.n_size:
-                successor = min(possible_successors[:self.n_size], key=lambda n:n.due_date)
+                successor = min(possible_successors[:self.n_size], key=lambda n: n.due_date)
                 self.giant_route.append(successor)
             else:
                 successor = min(possible_successors, key=lambda n: n.due_date)
@@ -302,6 +311,52 @@ class RoutingProblemSolver:
 
         new_route = self.generate_feasible_route_from_to(new_route, self.depot)
         self.routes.append(new_route)
+
+    def __calc_dist(self, i, j):
+        new_route = Route(self.config, self.depot)
+        new_route = self.generate_feasible_route_from_to(new_route, self.giant_route[i])
+
+        if new_route is None:
+            return sys.maxsize, None
+
+        while i != (j-1):
+            i += 1
+            new_route = self.generate_feasible_route_from_to(new_route, self.giant_route[i])
+            if new_route is None:
+                return sys.maxsize, None
+
+        new_route = self.generate_feasible_route_from_to(new_route, self.depot)
+        if new_route is None:
+            return sys.maxsize, None
+
+        return new_route.calculate_total_distance(), new_route
+
+    def solve_with_shortest_path(self):
+        self.routes = []
+
+        self.generate_giant_route()
+        cost = np.zeros((len(self.giant_route)+1, len(self.giant_route)+1), dtype=float)
+        routes = np.zeros((len(self.giant_route)+1, len(self.giant_route)+1), dtype=Route)
+
+        cost[:, :] = sys.maxsize
+        routes[:, :] = None
+
+        for i in range(0, len(self.giant_route)):
+            for j in range(i+1, len(self.giant_route)+1):
+                d, r = self.__calc_dist(i, j)
+                if r is None:
+                    break
+                else:
+                    cost[i, j] = d
+                    routes[i, j] = r
+
+        # solve shortest path problem
+
+        sp_solver = ShortestPathSolver(cost)
+        result = sp_solver.solve()
+
+        for r in result:
+            self.routes.append(routes[r[0], r[1]])
 
     def calculate_total_distance(self):
         total_dist = 0
