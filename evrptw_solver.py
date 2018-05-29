@@ -1,4 +1,4 @@
-from targets import Customer
+from targets import Customer, CharingStation
 
 
 class RoutingProblemConfiguration:
@@ -176,6 +176,7 @@ class Route:
         route_str += ']'
         return route_str
 
+
 class EVRPTWSolver:
     """
     A simple framework for solving the EVRPTW (Electronic Vehicle Routing Problem with Time Windows)
@@ -197,7 +198,12 @@ class EVRPTWSolver:
         if self.improvement_heuristic:
             solution = self.improvement_heuristic.improve(problem_instance, solution)
 
-        return 0, solution
+        dist = 0
+
+        for route in solution:
+            dist += route.calculate_total_distance()
+
+        return dist, solution
 
     def generate_feasible_route_from_to(self, from_route, to_station, problem_instance) -> Route:
         from_route.route.append(to_station)
@@ -243,7 +249,8 @@ class EVRPTWSolver:
 
         return from_route
 
-    def get_reachable_charging_stations(self, cust: Customer, capacity: float, tabu_list: list, problem_instance) -> list:
+    def get_reachable_charging_stations(self, cust: Customer, capacity: float, tabu_list: list,
+                                        problem_instance) -> list:
         max_dist = capacity / problem_instance.config.fuel_consumption_rate
         reachable_stations = []
 

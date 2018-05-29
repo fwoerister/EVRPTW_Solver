@@ -2,13 +2,13 @@ import numpy as np
 import sys
 
 from heuristics.shortest_path_solver import ShortestPathSolver
-from routing_problem_solver import Route
+from evrptw_solver import Route
 
 
 # =======================================================
 #                GIANT ROUTE HEURISTICS
 # =======================================================
-def k_nearest_neighbor_giant_tour(depot, customers, k=3):
+def k_nearest_neighbor_min_due_date(depot, customers, k=3):
     last_position = depot
     giant_route = []
 
@@ -25,7 +25,7 @@ def k_nearest_neighbor_giant_tour(depot, customers, k=3):
     return giant_route
 
 
-def nearest_neighbor_tolerance_giant_tour(depot, customers, tolerance=1.3):
+def nearest_neighbor_tolerance_min_due_date(depot, customers, tolerance=1.3):
     last_position = depot
     giant_route = []
 
@@ -39,6 +39,27 @@ def nearest_neighbor_tolerance_giant_tour(depot, customers, tolerance=1.3):
         possible_successors.sort(key=lambda n: n.distance_to(last_position))
 
         successor = min(possible_successors, key=lambda n: n.due_date)
+        giant_route.append(successor)
+
+        last_position = successor
+
+    return giant_route
+
+
+def nearest_neighbor_tolerance_min_ready_time(depot, customers, tolerance=1.3):
+    last_position = depot
+    giant_route = []
+
+    while len(giant_route) != len(customers):
+        possible_successors = [n for n in customers if n not in giant_route]
+        min_distance = min(possible_successors, key=lambda x: x.distance_to(last_position)).distance_to(
+            last_position)
+        possible_successors = [n for n in possible_successors if
+                               n.distance_to(last_position) <= min_distance * tolerance]
+
+        possible_successors.sort(key=lambda n: n.distance_to(last_position))
+
+        successor = min(possible_successors, key=lambda n: n.ready_time)
         giant_route.append(successor)
 
         last_position = successor
