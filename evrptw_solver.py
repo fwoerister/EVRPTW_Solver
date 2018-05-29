@@ -1,9 +1,5 @@
-import sys
-import numpy as np
+from targets import Customer
 
-from shortest_path_solver import ShortestPathSolver
-from targets import CharingStation, Customer
-from heapq import heappush, heappop
 
 class RoutingProblemConfiguration:
     def __init__(self, tank_capacity, payload_capacity, fuel_consumption_rate, charging_rate, velocity):
@@ -12,6 +8,14 @@ class RoutingProblemConfiguration:
         self.fuel_consumption_rate = fuel_consumption_rate
         self.charging_rate = charging_rate
         self.velocity = velocity
+
+
+class RoutingProblemInstance:
+    def __init__(self, config, depot, customers, charging_stations):
+        self.config = config
+        self.depot = depot
+        self.customers = customers
+        self.charging_stations = charging_stations
 
 
 class Route:
@@ -172,42 +176,30 @@ class Route:
         route_str += ']'
         return route_str
 
+class EVRPTWSolver:
+    """
+    A simple framework for solving the EVRPTW (Electronic Vehicle Routing Problem with Time Windows)
+    """
 
-class RoutingProblemSolver:
-    def __init__(self, depot, charging_stations, customers, config):
-        self.depot = depot
-        self.charging_stations = charging_stations
-        self.customers = customers
+    def __init__(self, construction_heuristic, improvement_heuristic=None):
+        """
+        :param construction_heuristic: heuristic for constructing a initial solution
+        :param improvement_heuristic: improvement heuristic, that improves the construction heuristic solution
+        """
+        self.construction_heuristic = construction_heuristic
+        self.improvement_heuristic = improvement_heuristic
 
-        self.config = config
+        self.construction_heuristic.set_generate_feasible_route_function(self.generate_feasible_route_from_to)
 
-        self.giant_route = None
-        self.routes = None
-        self.n_size = 3
-        self.tolerance = 1
+    def solve(self, problem_instance):
+        solution = self.construction_heuristic.solve(problem_instance)
 
-    def generate_giant_route(self):
-        last_position = self.depot
-        self.giant_route = []
-        while len(self.giant_route) != len(self.customers):
-            possible_successors = [n for n in self.customers if n not in self.giant_route]
-            nearest_distance = min(possible_successors, key=lambda x: x.distance_to(last_position)).distance_to(
-                last_position)
-            possible_successors = [n for n in possible_successors if
-                                   n.distance_to(last_position) <= nearest_distance * self.tolerance]
+        if self.improvement_heuristic:
+            solution = self.improvement_heuristic.improve(problem_instance, solution)
 
-            possible_successors.sort(key=lambda n: n.distance_to(last_position))
+        return 0, solution
 
-            if len(possible_successors) >= self.n_size:
-                successor = min(possible_successors[:self.n_size], key=lambda n: n.due_date)
-                self.giant_route.append(successor)
-            else:
-                successor = min(possible_successors, key=lambda n: n.due_date)
-                self.giant_route.append(successor)
-
-            last_position = successor
-
-    def generate_feasible_route_from_to(self, from_route, to_station):
+    def generate_feasible_route_from_to(self, from_route, to_station, problem_instance) -> Route:
         from_route.route.append(to_station)
 
         while not from_route.is_feasible():
@@ -217,7 +209,8 @@ class RoutingProblemSolver:
             from_route.route.pop()
             reachable_stations = self.get_reachable_charging_stations(from_route.route[-1],
                                                                       from_route.calculate_remaining_tank_capacity(),
-                                                                      from_route.route)
+                                                                      from_route.route,
+                                                                      problem_instance)
 
             if len(reachable_stations) == 0:
                 return None
@@ -227,12 +220,13 @@ class RoutingProblemSolver:
             from_route.route.append(best_station)
             from_route.route.append(to_station)
 
-        if to_station != self.depot and from_route.calculate_remaining_tank_capacity() < self.config.tank_capacity / 2:
+        if to_station != problem_instance.depot and from_route.calculate_remaining_tank_capacity() < problem_instance.config.tank_capacity / 2:
             from_route.route.pop()
 
             reachable_stations = self.get_reachable_charging_stations(from_route.route[-1],
                                                                       from_route.calculate_remaining_tank_capacity(),
-                                                                      from_route.route)
+                                                                      from_route.route,
+                                                                      problem_instance)
 
             if len(reachable_stations) > 0:
                 best_station = min(reachable_stations, key=lambda x: x.distance_to(to_station))
@@ -249,118 +243,12 @@ class RoutingProblemSolver:
 
         return from_route
 
-    def get_reachable_charging_stations(self, cust: Customer, capacity: float, tabu_list: list) -> list:
-        max_dist = capacity / self.config.fuel_consumption_rate
+    def get_reachable_charging_stations(self, cust: Customer, capacity: float, tabu_list: list, problem_instance) -> list:
+        max_dist = capacity / problem_instance.config.fuel_consumption_rate
         reachable_stations = []
 
-        for cs in self.charging_stations:
+        for cs in problem_instance.charging_stations:
             if cs.distance_to(cust) <= max_dist and cust.id != cs.id and cs.id not in [x.id for x in tabu_list]:
                 reachable_stations.append(cs)
 
         return reachable_stations
-
-    def solve(self):
-        self.routes = []
-
-        # self.__generate_initial_routes()
-        self.generate_giant_route()
-        self.giant_route.reverse()
-
-        new_route = Route(self.config, self.depot)
-        last_customer = None
-        while len(self.giant_route) != 0:
-            c = self.giant_route.pop()
-            extended_route = self.generate_feasible_route_from_to(new_route, c)
-
-            if extended_route is None:
-                self.giant_route.append(c)
-                while new_route.route[-1] != last_customer:
-                    new_route.route.pop()
-                new_route = self.generate_feasible_route_from_to(new_route, self.depot)
-                self.routes.append(new_route)
-                new_route = Route(self.config, self.depot)
-                continue
-            else:
-                new_route = extended_route
-
-            extended_route = self.generate_feasible_route_from_to(new_route, self.depot)
-
-            if extended_route is None:
-                self.giant_route.append(c)
-                while new_route.route[-1] != last_customer:
-                    new_route.route.pop()
-                new_route = self.generate_feasible_route_from_to(new_route, self.depot)
-                self.routes.append(new_route)
-                new_route = Route(self.config, self.depot)
-                continue
-            else:
-                new_route = extended_route
-
-            if not new_route.is_feasible():
-                while new_route.route[-1] != last_customer:
-                    new_route.route.pop()
-                new_route = self.generate_feasible_route_from_to(new_route, self.depot)
-                self.routes.append(new_route)
-                new_route = Route(self.config, self.depot)
-                self.giant_route.append(c)
-            else:
-                while new_route.route[-1] != c:
-                    new_route.route.pop()
-
-                last_customer = c
-
-        new_route = self.generate_feasible_route_from_to(new_route, self.depot)
-        self.routes.append(new_route)
-
-    def __calc_dist(self, i, j):
-        new_route = Route(self.config, self.depot)
-        new_route = self.generate_feasible_route_from_to(new_route, self.giant_route[i])
-
-        if new_route is None:
-            return sys.maxsize, None
-
-        while i != (j-1):
-            i += 1
-            new_route = self.generate_feasible_route_from_to(new_route, self.giant_route[i])
-            if new_route is None:
-                return sys.maxsize, None
-
-        new_route = self.generate_feasible_route_from_to(new_route, self.depot)
-        if new_route is None:
-            return sys.maxsize, None
-
-        return new_route.calculate_total_distance(), new_route
-
-    def solve_with_shortest_path(self):
-        self.routes = []
-
-        self.generate_giant_route()
-        cost = np.zeros((len(self.giant_route)+1, len(self.giant_route)+1), dtype=float)
-        routes = np.zeros((len(self.giant_route)+1, len(self.giant_route)+1), dtype=Route)
-
-        cost[:, :] = sys.maxsize
-        routes[:, :] = None
-
-        for i in range(0, len(self.giant_route)):
-            for j in range(i+1, len(self.giant_route)+1):
-                d, r = self.__calc_dist(i, j)
-                if r is None:
-                    break
-                else:
-                    cost[i, j] = d
-                    routes[i, j] = r
-
-        # solve shortest path problem
-
-        sp_solver = ShortestPathSolver(cost)
-        result = sp_solver.solve()
-
-        for r in result:
-            self.routes.append(routes[r[0], r[1]])
-
-    def calculate_total_distance(self):
-        total_dist = 0
-        for r in self.routes:
-            total_dist += r.calculate_total_distance()
-
-        return total_dist

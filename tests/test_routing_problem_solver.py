@@ -1,6 +1,6 @@
 import unittest
 
-from routing_problem_solver import RoutingProblemConfiguration, Route, RoutingProblemSolver
+from evrptw_solver import RoutingProblemConfiguration, Route
 from targets import Target, Customer, CharingStation
 
 

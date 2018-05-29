@@ -1,6 +1,6 @@
 import unittest
 
-from routing_problem_solver import RoutingProblemConfiguration, Route
+from evrptw_solver import RoutingProblemConfiguration, Route
 from targets import Target, Customer, CharingStation
 
 
@@ -22,10 +22,10 @@ class TestRoute(unittest.TestCase):
 
     def test_infeasibel_timewindow_with_charing_station(self):
         cust_1 = Customer('C1', 0, 30, 20, 30, 60, 10)
-        charing_station = CharingStation('S1',0,15,290,300,0)
+        charging_station = CharingStation('S1',0,15,290,300,0)
 
         self.r.route.append(cust_1)
-        self.r.route.append(charing_station)
+        self.r.route.append(charging_station)
         self.r.route.append(self.r.route[0])
 
         self.assertTrue(self.r.tw_constraint_violated())
