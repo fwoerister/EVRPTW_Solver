@@ -1,6 +1,7 @@
 .idea/
 problem_solutions/solution*.txt
 ex1_result_1126205.csv
+ex1_result_1126205.tex
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
