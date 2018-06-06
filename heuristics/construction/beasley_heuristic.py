@@ -25,6 +25,23 @@ def k_nearest_neighbor_min_due_date(depot, customers, k=3):
     return giant_route
 
 
+def k_nearest_neighbor_min_ready_time(depot, customers, k=3):
+    last_position = depot
+    giant_route = []
+
+    while len(giant_route) != len(customers):
+        possible_successors = [n for n in customers if n not in giant_route]
+        possible_successors.sort(key=lambda n: n.distance_to(last_position))
+        possible_successors = possible_successors[:k]
+
+        successor = min(possible_successors, key=lambda n: n.ready_time)
+        giant_route.append(successor)
+
+        last_position = successor
+
+    return giant_route
+
+
 def nearest_neighbor_tolerance_min_due_date(depot, customers, tolerance=1.3):
     last_position = depot
     giant_route = []

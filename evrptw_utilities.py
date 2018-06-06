@@ -1,5 +1,6 @@
 from evrptw_solver import RoutingProblemInstance, RoutingProblemConfiguration
 from targets import Target, CharingStation, Customer
+import matplotlib.pyplot as plt
 
 
 def load_problem_instance(file):
@@ -59,9 +60,23 @@ def write_solution_to_file(file, distance, routes):
             f.write('\n')
 
 
-def write_solution_stats_to_file(file, stat):
+def write_solution_stats_to_file(file, stat, style='csv'):
     with open(file, 'w') as result_file:
-        result_file.writelines('testcase;distance;runtime (in ms)\n')
-        for r in stat:
-            result_file.write('{0} ; {1} ; {2}\n'.format(r[0], r[1], r[2]))
+        if style == 'csv':
+            result_file.writelines('testcase;distance;runtime (in ms)\n')
+            for r in stat:
+                result_file.write('{0} ; {1} ; {2}\n'.format(r[0], round(r[1], 3), round(r[2], 3)))
+        elif style == 'latex':
+            result_file.write("\\begin{table}[t]\n")
+            result_file.write("\\label{tab:result}\n")
+            result_file.write("\\begin{tabular}{lrr}\n")
+            result_file.write("\\toprule\n")
+            result_file.write("instance & distance & runtime (in ms) \\\\ \n")
+            result_file.write("\\midrule")
 
+            for r in stat:
+                result_file.write('{0} & {1} & {2} \\\\ \n'.format(r[0], round(r[1], 3), round(r[2], 3)))
+
+            result_file.write("\\bottomrule \n")
+            result_file.write("\\end{tabular} \n")
+            result_file.write("\\end{table} \n")
