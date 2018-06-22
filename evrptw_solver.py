@@ -1,4 +1,5 @@
 from targets import Customer, CharingStation
+import numpy as np
 
 
 class RoutingProblemConfiguration:
@@ -16,6 +17,45 @@ class RoutingProblemInstance:
         self.depot = depot
         self.customers = customers
         self.charging_stations = charging_stations
+
+        # distance matrices
+        self.cust_cust_dist = np.zeros((len(self.customers), len(self.customers)))
+        self.cust_cs_dist = np.zeros((len(self.customers), len(self.charging_stations)))
+
+        # vertex lookup dict
+        self.vertices = dict()
+
+        # initialization of distance matrices
+        for i in range(0, len(self.customers)):
+            for j in range(0, len(self.customers)):
+
+                if i == 0:
+                    from_v = self.depot
+                else:
+                    from_v = self.customers[i-1]
+
+                if j == 0:
+                    to_v = self.depot
+                else:
+                    to_v = self.customers[j-1]
+
+                self.cust_cust_dist[i, j] = from_v.distance_to(to_v)
+
+        for i in range(1, len(self.customers)):
+            for j in range(0, len(self.charging_stations)-1):
+                if i == 0:
+                    from_v = self.depot
+                else:
+                    from_v = self.customers[i-1]
+
+                self.cust_cs_dist[i, j] = from_v.distance_to(self.charging_stations[j])
+
+        # initialization of the lookup dict
+        self.vertices[self.depot.id] = self.depot
+        for c in self.customers:
+            self.vertices[c.id] = c
+        for cs in self.charging_stations:
+            self.vertices[cs.id] = cs
 
 
 class Route:
@@ -158,6 +198,15 @@ class Route:
                     self.route.reverse()
                 return t
 
+    def append_route(self, new_route):
+        if new_route.route[0] == self.depot:
+            route_to_append = new_route[1:]
+
+        if self.route[-1] == self.depot:
+            self.route = self.route[0:-1]
+
+        self.route = self.route + route_to_append
+
     def __str__(self):
         route_str = '['
 
@@ -182,21 +231,21 @@ class EVRPTWSolver:
     A simple framework for solving the EVRPTW (Electronic Vehicle Routing Problem with Time Windows)
     """
 
-    def __init__(self, construction_heuristic, improvement_heuristic=None):
+    def __init__(self, construction_heuristic, meta_heuristic=None):
         """
         :param construction_heuristic: heuristic for constructing a initial solution
-        :param improvement_heuristic: improvement heuristic, that improves the construction heuristic solution
+        :param meta_heuristic: meta heuristic, that improves the construction heuristic solution
         """
         self.construction_heuristic = construction_heuristic
-        self.improvement_heuristic = improvement_heuristic
+        self.mea_heuristic = meta_heuristic
 
         self.construction_heuristic.set_generate_feasible_route_function(self.generate_feasible_route_from_to)
 
     def solve(self, problem_instance):
         solution = self.construction_heuristic.solve(problem_instance)
 
-        if self.improvement_heuristic:
-            solution = self.improvement_heuristic.improve(problem_instance, solution)
+        if self.mea_heuristic:
+            solution = self.mea_heuristic.improve(problem_instance, solution)
 
         dist = 0
 
@@ -249,7 +298,8 @@ class EVRPTWSolver:
 
         return from_route
 
-    def get_reachable_charging_stations(self, cust: Customer, capacity: float, tabu_list: list,
+    @staticmethod
+    def get_reachable_charging_stations(cust: Customer, capacity: float, tabu_list: list,
                                         problem_instance) -> list:
         max_dist = capacity / problem_instance.config.fuel_consumption_rate
         reachable_stations = []

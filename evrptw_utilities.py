@@ -1,4 +1,4 @@
-from evrptw_solver import RoutingProblemInstance, RoutingProblemConfiguration
+from evrptw_solver import RoutingProblemInstance, RoutingProblemConfiguration, Route
 from targets import Target, CharingStation, Customer
 import matplotlib.pyplot as plt
 
@@ -15,16 +15,18 @@ def load_problem_instance(file):
 
         while target_line != '\n':
             stl = target_line.split()  # splitted target_line
+            idx = int(stl[0][1:])
+
             if stl[1] == 'd':
-                depot = Target(stl[0], int(float(stl[2])), int(float(stl[3])), int(float(stl[5])),
+                depot = Target(stl[0], idx, int(float(stl[2])), int(float(stl[3])), int(float(stl[5])),
                                int(float(stl[6])),
                                int(float(stl[7])))
             elif stl[1] == 'f':
-                new_target = CharingStation(stl[0], int(float(stl[2])), int(float(stl[3])), int(float(stl[5])),
+                new_target = CharingStation(stl[0], idx, int(float(stl[2])), int(float(stl[3])), int(float(stl[5])),
                                             int(float(stl[6])), int(float(stl[7])))
                 fuel_stations.append(new_target)
             elif stl[1] == 'c':
-                new_target = Customer(stl[0], int(float(stl[2])), int(float(stl[3])), int(float(stl[4])),
+                new_target = Customer(stl[0], idx, int(float(stl[2])), int(float(stl[3])), int(float(stl[4])),
                                       int(float(stl[5])), int(float(stl[6])), int(float(stl[7])))
                 customers.append(new_target)
 
@@ -50,14 +52,33 @@ def load_problem_instance(file):
                                       fuel_stations)
 
 
+def load_solution(file):
+    with open(file, 'r') as f:
+        distance = float(f.readline())
+        solution = []
+
+        for line in f:
+            # [:-1] is needed, otherwise the last element of the list would be an empty string
+            route = line.split(', ')[:-1]
+
+            solution.append(route)
+
+        return distance, solution
+
+
 def write_solution_to_file(file, distance, routes):
     with open(file, 'w') as f:
         f.write('{0}\n'.format(round(distance, 3)))
 
         for r in routes:
-            for t in r.route:
-                f.write('{0}, '.format(t.id))
-            f.write('\n')
+            if type(r) is Route:
+                for t in r.route:
+                    f.write('{0}, '.format(t.id))
+                f.write('\n')
+            elif type(r) is list:
+                for v in r:
+                    f.write('{0}'.format(v.id))
+                f.write('\n')
 
 
 def write_solution_stats_to_file(file, stat, style='csv'):

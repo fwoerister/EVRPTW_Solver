@@ -2,8 +2,9 @@ import math as m
 
 
 class Target:
-    def __init__(self, id, x, y, ready_time, due_date, service_time):
+    def __init__(self, id, idx, x, y, ready_time, due_date, service_time):
         self.id = id
+        self.idx = idx
         self.x = x
         self.y = y
         self.ready_time = ready_time
@@ -24,11 +25,11 @@ class Target:
 
 
 class Customer(Target):
-    def __init__(self, id, x, y, demand, ready_time, due_date, service_time):
-        super(Customer, self).__init__(id, x, y, ready_time, due_date, service_time)
+    def __init__(self, id, idx, x, y, demand, ready_time, due_date, service_time):
+        super(Customer, self).__init__(id, idx, x, y, ready_time, due_date, service_time)
         self.demand = demand
 
 
 class CharingStation(Target):
-    def __init__(self, id, x, y, ready_time, due_date, service_time):
-        super(CharingStation, self).__init__(id, x, y, ready_time, due_date, service_time)
+    def __init__(self, id, idx, x, y, ready_time, due_date, service_time):
+        super(CharingStation, self).__init__(id, idx, x, y, ready_time, due_date, service_time)

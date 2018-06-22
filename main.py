@@ -4,8 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from os import listdir
 
+from evrptw_meta import VariableNeighbourhoodSearch
 from evrptw_solver import EVRPTWSolver
-from evrptw_utilities import load_problem_instance, write_solution_to_file, write_solution_stats_to_file
+from evrptw_utilities import load_problem_instance, load_solution, write_solution_to_file, write_solution_stats_to_file
 from heuristics.construction.beasley_heuristic import BeasleyHeuristic, k_nearest_neighbor_min_due_date, \
     k_nearest_neighbor_min_ready_time, nearest_neighbor_tolerance_min_due_date, \
     nearest_neighbor_tolerance_min_ready_time
@@ -15,12 +16,18 @@ RESULT_STATISTICS_LATEX_TABLE = 'ex1_result_1126205.tex'
 
 
 def main():
-    best_score, best_heuristic, best_param = find_best_heuristic_setting_experiment()
+
+    # best_score, best_heuristic, best_param = find_best_heuristic_setting_experiment()
+
+    # CACHING OF BEST RESULTS
+    best_score = 0
+    best_heuristic = nearest_neighbor_tolerance_min_ready_time
+    best_param = 1.8
 
     print("The best score of {0} was achieved with {1} and parameter {2}".format(best_score, best_heuristic,
                                                                                  round(best_param, 2)))
 
-    print("Solve instances with best heuristic...")
+    print("Generate initial solutions...")
 
     construction_heuristic = BeasleyHeuristic(best_heuristic, [best_param])
     test_case_statistics = []
@@ -37,6 +44,19 @@ def main():
             test_case_statistics.sort(key=lambda x: x[0])
             write_solution_stats_to_file(RESULT_STATISTICS_FILENAME, test_case_statistics)
             write_solution_stats_to_file(RESULT_STATISTICS_LATEX_TABLE, test_case_statistics, style='latex')
+
+    print("Apply meta-heuristic to improve solutions...")
+
+    for file in listdir('_problem_instances/exercise_instances/'):
+        if file.endswith('.txt'):
+            problem_instance = load_problem_instance('_problem_instances/exercise_instances/' + file)
+            distance, solution = load_solution('_problem_solutions/solution_{0}'.format(file))
+
+            meta_heuristic = VariableNeighbourhoodSearch(problem_instance, solution, distance)
+
+            distance, solution = meta_heuristic.improve_solution()
+
+            write_solution_to_file("_meta_solutions/solution_{0}".format(file),distance, solution)
 
     print("done")
 
