@@ -16,7 +16,6 @@ RESULT_STATISTICS_LATEX_TABLE = 'ex1_result_1126205.tex'
 
 
 def main():
-
     # best_score, best_heuristic, best_param = find_best_heuristic_setting_experiment()
 
     # CACHING OF BEST RESULTS
@@ -27,36 +26,52 @@ def main():
     print("The best score of {0} was achieved with {1} and parameter {2}".format(best_score, best_heuristic,
                                                                                  round(best_param, 2)))
 
+    print()
+    print("============================================")
     print("Generate initial solutions...")
+    print("============================================")
+    print()
 
     construction_heuristic = BeasleyHeuristic(best_heuristic, [best_param])
     test_case_statistics = []
     solver = EVRPTWSolver(construction_heuristic)
     for file in listdir('_problem_instances/exercise_instances/'):
         if file.endswith('.txt'):
+            print('process file {0}'.format(file))
+            print('load problem instance...')
             problem_instance = load_problem_instance('_problem_instances/exercise_instances/' + file)
-
+            print('generate routes...')
             duration = timeit.timeit(functools.partial(solver.solve, problem_instance), number=1) * 1000
             distance, solution = solver.solve(problem_instance)
             test_case_statistics.append((file, distance, duration))
+            print('write results to file ...')
             write_solution_to_file("_problem_solutions/solution_{0}".format(file), distance, solution)
+            print()
 
             test_case_statistics.sort(key=lambda x: x[0])
             write_solution_stats_to_file(RESULT_STATISTICS_FILENAME, test_case_statistics)
             write_solution_stats_to_file(RESULT_STATISTICS_LATEX_TABLE, test_case_statistics, style='latex')
 
+    print()
+    print("============================================")
     print("Apply meta-heuristic to improve solutions...")
+    print("============================================")
+    print()
 
     for file in listdir('_problem_instances/exercise_instances/'):
         if file.endswith('.txt'):
+            print("process file {0}".format(file))
             problem_instance = load_problem_instance('_problem_instances/exercise_instances/' + file)
             distance, solution = load_solution('_problem_solutions/solution_{0}'.format(file))
 
             meta_heuristic = VariableNeighbourhoodSearch(problem_instance, solution, distance)
 
+            print('start to improve the routes...')
             distance, solution = meta_heuristic.improve_solution()
 
+            print("write results to file...")
             write_solution_to_file("_meta_solutions/solution_{0}".format(file),distance, solution)
+            print()
 
     print("done")
 
