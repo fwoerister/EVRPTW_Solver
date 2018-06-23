@@ -77,7 +77,7 @@ def write_solution_to_file(file, distance, routes):
                 f.write('\n')
             elif type(r) is list:
                 for v in r:
-                    f.write('{0}'.format(v.id))
+                    f.write('{0}, '.format(v))
                 f.write('\n')
 
 
