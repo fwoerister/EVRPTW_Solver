@@ -7,15 +7,41 @@ from targets import Customer, CharingStation
 
 from itertools import combinations, product
 
-K_MAX = 2
-NO_IMPROVEMENT_TOLERANCE = 2
+K_MAX = 4
+NO_IMPROVEMENT_TOLERANCE = 1
+
+
+class SimulatedAnnealing:
+    def __init__(self, problem_instance: RoutingProblemInstance, solution, distance, t_0, beta):
+        self.problem_instance = problem_instance
+        self.solution = solution
+        self.distance = distance
+        self.temp = t_0
+        self.beta = beta
+
+    def improve_solution(self, state, distances):
+        state_approx = state
+        current_state = state
+        current_distances = distances
+
+        while temp > 1:
+            random_neighbour, random_distances = get_random_feasible_neighbour(current_state)
+
+            delta = sum(random_distances) - sum(current_distances) / sum(current_distances)
+
+            if delta <= 0:
+
+
+    def get_random_feasible_neighbour(self, state):
 
 
 class VariableNeighbourhoodSearch:
     """
-        N_0 -> 2-exchange within routes
-        N_1 -> Moving a customer to another route
-        N_2 -> Merge two routes
+        N_0 -> 2-exchange within routes (intra route)
+        N_1 -> 2-opt (intra route)
+        N_2 -> Moving a customer to another route (inter route)
+        N_3 -> Merge two routes (inter route)
+        N_4 -> 2opt*-operator (inter route)
     """
 
     def __init__(self, problem_instance: RoutingProblemInstance, solution, distance):
@@ -42,7 +68,7 @@ class VariableNeighbourhoodSearch:
                                                                                               route_dist_cache)
 
                 # find local minimum of the random solution
-                ls_solution, ls_route_dist_cache = self.do_local_search(k, next_rand_sol, next_route_dist_cache)
+                ls_solution, ls_route_dist_cache = self.do_local_search(next_rand_sol, next_route_dist_cache)
 
                 if sum(ls_route_dist_cache) < best_dist:
                     # the solution was better than the current -> restart with neighbourhood 0
@@ -53,14 +79,16 @@ class VariableNeighbourhoodSearch:
                     # solution was not better -> try to improve with next neighbourhood
                     k += 1
 
-            if result_cache.qsize() < NO_IMPROVEMENT_TOLERANCE:
-                result_cache.put(best_dist)
-            else:
+            result_cache.put(best_dist)
+
+            if result_cache.qsize() == NO_IMPROVEMENT_TOLERANCE:
                 prev_dist = result_cache.get()
 
-                # In case there was no improvement within the last 5 rounds -> terminate!
+                # In case there was no improvement within the last [NO_IMPROVEMENT_TOLERANCE] rounds -> terminate!
                 if prev_dist == best_dist:
                     break
+                else:
+                    print('hallo')
 
         return best_dist, best_solution
 
@@ -94,8 +122,34 @@ class VariableNeighbourhoodSearch:
                         else:
                             route[from_idx], route[to_idx] = route[to_idx], route[from_idx]
 
-        # N_1 -> Moving a customer to another route
+        # N_1 -> 2opt
         elif neighbourhood_index == 1:
+            route_indices = list(range(0, len(current_solution) - 1))
+            shuffle(route_indices)
+
+            for route_idx in route_indices:
+                route = list(current_solution[route_idx])
+
+                cut_points = list(product(range(1, len(route) - 1), range(0, len(route) - 1)))
+                shuffle(cut_points)
+
+                for cp in cut_points:
+                    if cp[0] < cp[1] and cp[1] - cp[0] > 1:
+                        part_1 = route[:cp[0]]
+                        part_2 = route[cp[0]:cp[1]]
+                        part_3 = route[cp[1]:]
+
+                        new_dist = self.calculate_route_distance(part_1 + part_2 + part_3)
+
+                        if self.is_feasible(part_1 + part_2 + part_3):
+                            route_dist_cache = route_dist_cache[:route_idx] + [new_dist] + route_dist_cache[
+                                                                                           route_idx + 1:]
+                            new_solution = current_solution[:route_idx] + [part_1 + part_2 + part_3] + current_solution[
+                                                                                                       route_idx + 1:]
+                            return new_solution, route_dist_cache
+
+        # N_2 -> Moving a customer to another route
+        elif neighbourhood_index == 2:
             route_combinations = list(combinations(range(0, len(current_solution)), 2))
             shuffle(route_combinations)
 
@@ -116,15 +170,15 @@ class VariableNeighbourhoodSearch:
                             if combination[0] < combination[1]:
                                 new_solution = current_solution[:combination[0]]
                                 new_solution += [to_route]
-                                new_solution += current_solution[combination[0]+1:combination[1]]
+                                new_solution += current_solution[combination[0] + 1:combination[1]]
                                 new_solution += [from_route]
-                                new_solution += current_solution[combination[1]+1:]
+                                new_solution += current_solution[combination[1] + 1:]
 
                                 new_route_dist_cache = route_dist_cache[:combination[0]]
                                 new_route_dist_cache += [self.calculate_route_distance(to_route)]
-                                new_route_dist_cache += route_dist_cache[combination[0]+1:combination[1]]
+                                new_route_dist_cache += route_dist_cache[combination[0] + 1:combination[1]]
                                 new_route_dist_cache += [self.calculate_route_distance(from_route)]
-                                new_route_dist_cache += route_dist_cache[combination[1]+1:]
+                                new_route_dist_cache += route_dist_cache[combination[1] + 1:]
                             else:
                                 new_solution = current_solution[:combination[1]]
                                 new_solution += [from_route]
@@ -142,8 +196,8 @@ class VariableNeighbourhoodSearch:
                         else:
                             from_route[tp[0]], to_route[tp[1]] = to_route[tp[1]], from_route[tp[0]]
 
-        # N_2 -> Merge two routes
-        elif neighbourhood_index == 2:
+        # N_3 -> Merge two routes
+        elif neighbourhood_index == 3:
             route_combinations = list(combinations(range(0, len(current_solution)), 2))
             shuffle(route_combinations)
 
@@ -152,56 +206,154 @@ class VariableNeighbourhoodSearch:
                 to_route = list(current_solution[combination[1]])
 
                 new_route = None
-                if self.is_feasible(from_route[:-1]+to_route[1:]):
-                    new_route = from_route[:-1]+to_route[1:]
-                elif self.is_feasible(to_route[:-1]+from_route[1:]):
-                    new_route = to_route[:-1]+from_route[1:]
+                if self.is_feasible(from_route[:-1] + to_route[1:]):
+                    new_route = from_route[:-1] + to_route[1:]
+                elif self.is_feasible(to_route[:-1] + from_route[1:]):
+                    new_route = to_route[:-1] + from_route[1:]
 
                 if new_route:
                     new_solution = current_solution[:combination[0]]
                     new_solution += [new_route]
-                    new_solution += current_solution[combination[0]+1:combination[1]]
-                    new_solution += current_solution[combination[1]+1:]
+                    new_solution += current_solution[combination[0] + 1:combination[1]]
+                    new_solution += current_solution[combination[1] + 1:]
 
                     new_route_dist_cache = route_dist_cache[:combination[0]]
                     new_route_dist_cache += [self.calculate_route_distance(new_route)]
-                    new_route_dist_cache += route_dist_cache[combination[0]+1:combination[1]]
-                    new_route_dist_cache += route_dist_cache[combination[1]+1:]
+                    new_route_dist_cache += route_dist_cache[combination[0] + 1:combination[1]]
+                    new_route_dist_cache += route_dist_cache[combination[1] + 1:]
 
                     return new_solution, new_route_dist_cache
 
+        # N_4 -> 2opt*-operator
+        elif neighbourhood_index == 4:
+            route_combinations = list(combinations(range(0, len(current_solution)), 2))
+            shuffle(route_combinations)
+
+            for combination in route_combinations:
+                route_1 = list(current_solution[combination[0]])
+                route_2 = list(current_solution[combination[1]])
+
+                swap_points = list(product(range(1, len(route_1)), range(1, len(route_2))))
+                shuffle(swap_points)
+
+                for sp in swap_points:
+                    split_index_1 = sp[0]
+                    split_index_2 = sp[1]
+                    # sp_1 = self.problem_instance.vertices[route_1[split_index_1]]
+                    # sp_2 = self.problem_instance.vertices[route_2[split_index_2]]
+
+                    if split_index_1 >= 2:
+                        sp_prev = self.problem_instance.vertices[route_1[split_index_1 - 1]]
+
+                        if type(sp_prev) is CharingStation:
+                            split_index_1 -= 1
+                            # sp_1 = sp_prev
+
+                    if split_index_2 >= 2:
+                        sp_prev = self.problem_instance.vertices[route_2[split_index_2 - 1]]
+
+                        if type(sp_prev) is CharingStation:
+                            split_index_2 -= 1
+                            # sp_2 = sp_prev
+
+                    new_route_1 = route_1[:split_index_1] + route_2[split_index_2:]
+                    new_route_2 = route_2[:split_index_2] + route_1[split_index_1:]
+
+                    if self.is_feasible(new_route_1) and self.is_feasible(new_route_2):
+                        current_solution[combination[0]] = new_route_1
+                        current_solution[combination[1]] = new_route_2
+
+                        route_dist_cache[combination[0]] = self.calculate_route_distance(new_route_1)
+                        route_dist_cache[combination[1]] = self.calculate_route_distance(new_route_2)
+
+                        return current_solution, route_dist_cache
+
         return current_solution, route_dist_cache
 
-    def do_local_search(self, neighbourhood_index, initial_solution, route_dist_cache):
+    def do_local_search(self, initial_solution, route_dist_cache):
 
         best_dist = sum(route_dist_cache)
         best_solution = initial_solution
         best_route_dist_cache = route_dist_cache
 
-        if neighbourhood_index == 0:
-            next_best_solution, next_best_route_dist_cache = self.get_next_best_n0_neighbour(best_solution,
-                                                                                             best_route_dist_cache)
-        elif neighbourhood_index == 1:
-            next_best_solution, next_best_route_dist_cache = self.get_next_best_n1_neighbour(best_solution,
-                                                                                             best_route_dist_cache)
-        elif neighbourhood_index == 2:
-            next_best_solution, next_best_route_dist_cache = self.get_next_best_n2_neighbour(best_solution,
-                                                                                             best_route_dist_cache)
+        solution_improved = False
 
-        while sum(next_best_route_dist_cache) < best_dist:
+        next_best_solution, next_best_route_dist_cache = self.get_next_best_n0_neighbour(best_solution,
+                                                                                         best_route_dist_cache)
+        if best_dist > sum(next_best_route_dist_cache):
+            best_dist = sum(next_best_route_dist_cache)
+            best_solution = next_best_solution
+            solution_improved = True
+
+        next_best_solution, next_best_route_dist_cache = self.get_next_best_n1_neighbour(best_solution,
+                                                                                         best_route_dist_cache)
+        if best_dist > sum(next_best_route_dist_cache):
+            best_dist = sum(next_best_route_dist_cache)
+            best_solution = next_best_solution
+            solution_improved = True
+
+        next_best_solution, next_best_route_dist_cache = self.get_next_best_n2_neighbour(best_solution,
+                                                                                         best_route_dist_cache)
+
+        if best_dist > sum(next_best_route_dist_cache):
+            best_dist = sum(next_best_route_dist_cache)
+            best_solution = next_best_solution
+            solution_improved = True
+
+        next_best_solution, next_best_route_dist_cache = self.get_next_best_n3_neighbour(best_solution,
+                                                                                         best_route_dist_cache)
+        if best_dist > sum(next_best_route_dist_cache):
+            best_dist = sum(next_best_route_dist_cache)
+            best_solution = next_best_solution
+            solution_improved = True
+
+        next_best_solution, next_best_route_dist_cache = self.get_next_best_n4_neighbour(best_solution,
+                                                                                         best_route_dist_cache)
+        while solution_improved:
+            solution_improved = False
             best_solution = next_best_solution
             best_dist = sum(next_best_route_dist_cache)
             best_route_dist_cache = next_best_route_dist_cache
 
-            if neighbourhood_index == 0:
-                next_best_solution, next_best_route_dist_cache = self.get_next_best_n0_neighbour(best_solution,
-                                                                                                 best_route_dist_cache)
-            elif neighbourhood_index == 1:
-                next_best_solution, next_best_route_dist_cache = self.get_next_best_n1_neighbour(best_solution,
-                                                                                                 best_route_dist_cache)
-            elif neighbourhood_index == 2:
-                next_best_solution, next_best_route_dist_cache = self.get_next_best_n2_neighbour(best_solution,
-                                                                                                 best_route_dist_cache)
+            next_best_solution, next_best_route_dist_cache = self.get_next_best_n0_neighbour(best_solution,
+                                                                                             best_route_dist_cache)
+
+            if best_dist > sum(next_best_route_dist_cache):
+                best_dist = sum(next_best_route_dist_cache)
+                best_solution = next_best_solution
+                solution_improved = True
+
+            next_best_solution, next_best_route_dist_cache = self.get_next_best_n1_neighbour(best_solution,
+                                                                                             best_route_dist_cache)
+
+            if best_dist > sum(next_best_route_dist_cache):
+                best_dist = sum(next_best_route_dist_cache)
+                best_solution = next_best_solution
+                solution_improved = True
+
+            next_best_solution, next_best_route_dist_cache = self.get_next_best_n2_neighbour(best_solution,
+                                                                                             best_route_dist_cache)
+
+            if best_dist > sum(next_best_route_dist_cache):
+                best_dist = sum(next_best_route_dist_cache)
+                best_solution = next_best_solution
+                solution_improved = True
+
+            next_best_solution, next_best_route_dist_cache = self.get_next_best_n3_neighbour(best_solution,
+                                                                                             best_route_dist_cache)
+
+            if best_dist > sum(next_best_route_dist_cache):
+                best_dist = sum(next_best_route_dist_cache)
+                best_solution = next_best_solution
+                solution_improved = True
+
+            next_best_solution, next_best_route_dist_cache = self.get_next_best_n4_neighbour(best_solution,
+                                                                                             best_route_dist_cache)
+
+            if best_dist > sum(next_best_route_dist_cache):
+                best_dist = sum(next_best_route_dist_cache)
+                best_solution = next_best_solution
+                solution_improved = True
 
         return best_solution, best_route_dist_cache
 
@@ -229,10 +381,38 @@ class VariableNeighbourhoodSearch:
         return best_solution, route_dist_cache
 
     def get_next_best_n1_neighbour(self, solution, route_dist_cache):
+
+        route_indices = list(range(0, len(solution) - 1))
+        shuffle(route_indices)
+
+        for route_idx in route_indices:
+            route = list(solution[route_idx])
+
+            cut_points = list(product(range(1, len(route) - 1), range(0, len(route) - 1)))
+            shuffle(cut_points)
+
+            for cp in cut_points:
+                if cp[0] < cp[1] and cp[1] - cp[0] > 1:
+                    part_1 = route[:cp[0]]
+                    part_2 = route[cp[0]:cp[1]]
+                    part_3 = route[cp[1]:]
+
+                    new_dist = self.calculate_route_distance(part_1 + part_2 + part_3)
+                    new_route_dist_cache = route_dist_cache[:route_idx] + [new_dist] + route_dist_cache[route_idx + 1:]
+
+                    new_solution = solution[:route_idx] + [part_1 + part_2 + part_3] + solution[
+                                                                                       route_idx + 1:]
+
+                    if self.is_feasible(part_1 + part_2 + part_3) and sum(route_dist_cache) > sum(new_route_dist_cache):
+                        return new_solution, route_dist_cache
+
+        return solution, route_dist_cache
+
+    def get_next_best_n2_neighbour(self, solution, route_dist_cache):
         best_solution = solution
         best_dist = sum(route_dist_cache)
 
-        route_combinations = list(combinations(range(0, len(solution)),2))
+        route_combinations = list(combinations(range(0, len(solution)), 2))
         shuffle(route_combinations)
 
         for combination in route_combinations:
@@ -281,7 +461,7 @@ class VariableNeighbourhoodSearch:
 
         return best_solution, route_dist_cache
 
-    def get_next_best_n2_neighbour(self, solution, route_dist_cache):
+    def get_next_best_n3_neighbour(self, solution, route_dist_cache):
         route_combinations = list(combinations(range(0, len(solution)), 2))
         shuffle(route_combinations)
 
@@ -309,6 +489,50 @@ class VariableNeighbourhoodSearch:
                 if sum(new_route_dist_cache) < sum(route_dist_cache):
                     return new_solution, new_route_dist_cache
 
+        return solution, route_dist_cache
+
+    def get_next_best_n4_neighbour(self, solution, route_dist_cache):
+        route_combinations = list(combinations(range(0, len(solution)), 2))
+        shuffle(route_combinations)
+
+        for combination in route_combinations:
+            route_1 = list(solution[combination[0]])
+            route_2 = list(solution[combination[1]])
+
+            swap_points = list(product(range(1, len(route_1)), range(1, len(route_2))))
+            shuffle(swap_points)
+
+            for sp in swap_points:
+                split_index_1 = sp[0]
+                split_index_2 = sp[1]
+
+                if split_index_1 >= 2:
+                    sp_prev = self.problem_instance.vertices[route_1[split_index_1 - 1]]
+
+                    if type(sp_prev) is CharingStation:
+                        split_index_1 -= 1
+                        # sp_1 = sp_prev
+
+                if split_index_2 >= 2:
+                    sp_prev = self.problem_instance.vertices[route_2[split_index_2 - 1]]
+
+                    if type(sp_prev) is CharingStation:
+                        split_index_2 -= 1
+                        # sp_2 = sp_prev
+
+                new_route_1 = route_1[:split_index_1] + route_2[split_index_2:]
+                new_route_2 = route_2[:split_index_2] + route_1[split_index_1:]
+
+                if self.is_feasible(new_route_1) and self.is_feasible(new_route_2):
+                    if (self.calculate_route_distance(new_route_1) + self.calculate_route_distance(new_route_2)) < \
+                            route_dist_cache[combination[0]] + route_dist_cache[combination[1]]:
+                        solution[combination[0]] = new_route_1
+                        solution[combination[1]] = new_route_2
+
+                        route_dist_cache[combination[0]] = self.calculate_route_distance(new_route_1)
+                        route_dist_cache[combination[1]] = self.calculate_route_distance(new_route_2)
+
+                        return solution, route_dist_cache
         return solution, route_dist_cache
 
     def is_feasible(self, route):

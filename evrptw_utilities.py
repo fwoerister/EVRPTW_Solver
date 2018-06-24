@@ -72,13 +72,15 @@ def write_solution_to_file(file, distance, routes):
 
         for r in routes:
             if type(r) is Route:
-                for t in r.route:
-                    f.write('{0}, '.format(t.id))
-                f.write('\n')
+                if len(r.route) > 2:
+                    for t in r.route:
+                        f.write('{0}, '.format(t.id))
+                    f.write('\n')
             elif type(r) is list:
-                for v in r:
-                    f.write('{0}, '.format(v))
-                f.write('\n')
+                if len(r) > 2:
+                    for v in r:
+                        f.write('{0}, '.format(v))
+                    f.write('\n')
 
 
 def write_solution_stats_to_file(file, stat, style='csv'):
