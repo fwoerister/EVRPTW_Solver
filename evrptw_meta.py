@@ -1,38 +1,302 @@
 from copy import deepcopy
 from queue import LifoQueue
-from random import randint, shuffle
+from random import randint, shuffle, random, choice
+from math import exp
 
 from evrptw_solver import RoutingProblemInstance
 from targets import Customer, CharingStation
 
 from itertools import combinations, product
 
+import sys
+
 K_MAX = 4
 NO_IMPROVEMENT_TOLERANCE = 1
 
 
-class SimulatedAnnealing:
-    def __init__(self, problem_instance: RoutingProblemInstance, solution, distance, t_0, beta):
-        self.problem_instance = problem_instance
-        self.solution = solution
-        self.distance = distance
-        self.temp = t_0
-        self.beta = beta
+# neighbourhoods
+def two_opt_star(state, distances, feasibility_operator, route_length_operator, min_dist=sys.maxsize):
+    route_combinations = list(combinations(range(0, len(state)), 2))
+    shuffle(route_combinations)
 
-    def improve_solution(self, state, distances):
-        state_approx = state
+    for c in route_combinations:
+        route_1 = list(state[c[0]])
+        route_2 = list(state[c[1]])
+
+        swap_points = list(product(range(1, len(route_1) - 1), range(1, len(route_2) - 1)))
+        shuffle(swap_points)
+
+        for sp in swap_points:
+            split_index_1 = sp[0]
+            split_index_2 = sp[1]
+
+            new_route_1 = route_1[:split_index_1] + route_2[split_index_2:]
+            new_route_2 = route_2[:split_index_2] + route_1[split_index_1:]
+
+            d_1 = route_length_operator(new_route_1)
+            d_2 = route_length_operator(new_route_2)
+
+            new_distances = distances[:c[0]] + [d_1] + distances[c[0] + 1:c[1]] + [d_2] + distances[c[1] + 1:]
+            new_state = state[:c[0]] + [new_route_1] + state[c[0] + 1:c[1]] + [new_route_2] + state[c[1] + 1:]
+
+            if feasibility_operator(new_route_1) and feasibility_operator(new_route_2) \
+                    and sum(new_distances) < min_dist:
+                return new_state, new_distances
+    return state, distances
+
+
+def two_opt(state, distances, feasibility_operator, route_length_operator, min_dist=sys.maxsize):
+    route_indices = list(range(0, len(state)))
+    shuffle(route_indices)
+
+    for i in route_indices:
+        route = state[i]
+        cut_points = list(product(range(1, len(route) - 1), range(0, len(route) - 1)))
+        shuffle(cut_points)
+
+        for cp in cut_points:
+            if cp[0] < cp[1] and cp[1] - cp[0] > 1:
+                part_1 = route[:cp[0]]
+                part_2 = route[cp[0]:cp[1]]
+                part_3 = route[cp[1]:]
+
+                part_2.reverse()
+
+                d = route_length_operator(part_1 + part_2 + part_3)
+
+                new_distances = distances[:i] + [d] + distances[i + 1:]
+
+                if feasibility_operator(part_1 + part_2 + part_3) and sum(new_distances) < min_dist:
+                    new_state = state[:i] + [part_1 + part_2 + part_3] + state[i + 1:]
+                    return new_state, new_distances
+
+    return state, distances
+
+
+def or_opt(state, distances, feasibility_operator, route_length_operator, min_dist=sys.maxsize):
+    route_indices = list(range(0, len(state)))
+    shuffle(route_indices)
+
+    for i in route_indices:
+        route = state[i]
+        cut_points = list(product(range(1, len(route) - 1), range(0, len(route) - 1)))
+        shuffle(cut_points)
+
+        for cp in cut_points:
+            if cp[0] < cp[1] and cp[1] - cp[0] > 1:
+                part_1 = route[:cp[0]]
+                part_2 = route[cp[0]:cp[1]]
+                part_3 = route[cp[1]:]
+
+                offset = randint(0, len(part_3) - 1)
+
+                route = part_1 + part_3[:offset] + part_2 + part_3[offset:]
+
+                d = route_length_operator(route)
+
+                new_distances = distances[:i] + [d] + distances[i + 1:]
+
+                if feasibility_operator(route) and sum(new_distances) < min_dist:
+                    new_state = state[:i] + [route] + state[i + 1:]
+                    return new_state, new_distances
+    return state, distances
+
+
+def cross_exchange(state, distances, feasibility_operator, route_length_operator, min_dist=sys.maxsize):
+    route_combinations = list(combinations(range(0, len(state)), 2))
+    shuffle(route_combinations)
+
+    for c in route_combinations:
+        route_1 = list(state[c[0]])
+        route_2 = list(state[c[1]])
+
+        swap_points = list(product(range(1, len(route_1) - 1), range(1, len(route_1) - 1), range(1, len(route_2) - 1),
+                                   range(1, len(route_2) - 1)))
+        shuffle(swap_points)
+
+        for sp in swap_points:
+
+            if sp[0] < sp[1] - 1 and sp[2] < sp[3] - 1:
+                sr_1_s = min(sp[0], sp[1])
+                sr_1_e = max(sp[0], sp[1])
+                sr_2_s = min(sp[2], sp[3])
+                sr_2_e = max(sp[2], sp[3])
+
+                new_route_1 = route_1[:sr_1_s] + route_2[sr_2_s:sr_2_e] + route_1[sr_1_e:]
+                new_route_2 = route_2[:sr_2_s] + route_1[sr_1_s:sr_1_e] + route_2[sr_2_e:]
+
+                new_distances = distances[:c[0]] + [route_length_operator(new_route_1)] + distances[c[0] + 1:c[1]] \
+                                + [route_length_operator(new_route_2)] + distances[c[1] + 1:]
+
+                if sum(new_distances) < min_dist and feasibility_operator(new_route_1) and feasibility_operator(
+                        new_route_2):
+                    new_state = state[:c[0]] + [new_route_1] + state[c[0] + 1:c[1]] + [new_route_2] + state[c[1] + 1:]
+                    return new_state, new_distances
+    return state, distances
+
+
+def merge_route(state, distances, feasibility_operator, route_length_operator, min_distance=sys.maxsize):
+    route_combinations = list(combinations(range(0, len(state)), 2))
+    shuffle(route_combinations)
+
+    for c in route_combinations:
+        route_1 = list(state[c[0]])
+        route_2 = list(state[c[1]])
+
+        new_distances = distances[:c[0]] \
+                        + [route_length_operator(route_1[:-1] + route_2[1:])] \
+                        + distances[c[0] + 1:c[1]] \
+                        + distances[c[1] + 1:]
+
+        if feasibility_operator(route_1[:-1] + route_2[1:]) and sum(new_distances) < min_distance:
+            new_state = state[:c[0]] + [route_1[:-1] + route_2[1:]] + state[c[0] + 1:c[1]] + state[c[1] + 1:]
+            return new_state, new_distances
+    return state, distances
+
+
+class SimulatedAnnealing:
+    def __init__(self, problem_instance: RoutingProblemInstance, state, distances, t_0, cooling_factor, rep=1):
+        self.problem_instance = problem_instance
+        self.state = state
+        self.distances = list()
+        for r in self.state:
+            self.distances.append(self.calculate_route_distance(r))
+        self.t_0 = t_0
+        self.temp = t_0
+        self.cooling_factor = cooling_factor
+        self.rep = rep
+
+        self.neighbour_hoods = [merge_route, two_opt, two_opt_star, or_opt, cross_exchange]
+
+    def improve_solution(self):
+        state_approx = self.state
+        distance_approx = self.distances
+        iteration = 0
+        for r in range(0, self.rep):
+            self.temp = self.t_0
+            current_state = state_approx
+            current_distances = distance_approx
+            while self.temp > 0.00000000001:
+                random_neighbour, random_distances = self.get_random_feasible_neighbour(current_state,
+                                                                                        current_distances,
+                                                                                        iteration)
+
+                delta = (sum(random_distances) - sum(current_distances)) / sum(current_distances)
+
+                if delta < 0:
+                    current_state = random_neighbour
+                    current_distances = random_distances
+
+                    if sum(distance_approx) > sum(current_distances):
+                        # current_state, current_distances = self.local_search(random_neighbour, random_distances)
+                        state_approx = current_state
+                        distance_approx = current_distances
+                else:
+                    random_number = random()
+
+                    if random_number < exp(-1 * delta / self.temp):
+                        current_state = random_neighbour
+                        current_distances = random_distances
+
+                self.temp *= self.cooling_factor
+                iteration += 1
+
+        print('do local search on best solution')
+        state_approx, distance_approx = self.local_search(state_approx, distance_approx)
+        return sum(distance_approx), state_approx
+
+    def get_random_feasible_neighbour(self, state, distances, iteration):
+        next_state = state
+        next_distances = distances
+
+        for nh_op in self.neighbour_hoods:
+            if choice([True, False]):
+                next_state, next_distances = nh_op(next_state, next_distances, self.is_feasible,
+                                                   self.calculate_route_distance)
+
+        return next_state, next_distances
+
+    def local_search(self, state, distances):
         current_state = state
         current_distances = distances
 
-        while temp > 1:
-            random_neighbour, random_distances = get_random_feasible_neighbour(current_state)
+        while True:
+            best_neighbour, best_neighbour_distances = self.get_best_neighbour(current_state, current_distances)
 
-            delta = sum(random_distances) - sum(current_distances) / sum(current_distances)
+            if sum(best_neighbour_distances) < sum(current_distances):
+                current_state = best_neighbour
+                current_distances = best_neighbour_distances
+                continue
 
-            if delta <= 0:
+            break
 
+        return current_state, current_distances
 
-    def get_random_feasible_neighbour(self, state):
+    def get_best_neighbour(self, state, distances):
+        best_state = state
+        best_distances = distances
+
+        for nh_op in self.neighbour_hoods:
+            best_state, best_distances = nh_op(best_state, best_distances, self.is_feasible,
+                                               self.calculate_route_distance,
+                                               sum(best_distances))
+
+        return best_state, best_distances
+
+    def is_feasible(self, route):
+        """
+        slow implementation for checking the feasibility of a route
+        :param route: route to check
+        :return: returns True if the route is feasible
+        """
+        q = self.problem_instance.config.tank_capacity
+        energy_capacity = self.problem_instance.config.tank_capacity
+        load_capacity = self.problem_instance.config.payload_capacity
+        velocity = self.problem_instance.config.velocity
+        fuel_consumption_rate = self.problem_instance.config.fuel_consumption_rate
+        charging_rate = self.problem_instance.config.charging_rate
+
+        last_position = self.problem_instance.depot
+        time = self.problem_instance.depot.ready_time + self.problem_instance.depot.service_time
+
+        for v in route[1:]:
+            target = self.problem_instance.vertices[v]
+            d = last_position.distance_to(target)
+            time += d / velocity
+            energy_capacity -= d * fuel_consumption_rate
+
+            if energy_capacity < 0:
+                return False
+
+            if time > target.due_date:
+                return False
+
+            if time < target.ready_time:
+                time = target.ready_time
+
+            if type(target) is Customer:
+                load_capacity -= target.demand
+                time += target.service_time
+            elif type(target) is CharingStation:
+                time += (q - energy_capacity) * charging_rate
+
+            if load_capacity < 0:
+                return False
+
+            last_position = target
+
+        return True
+
+    def calculate_route_distance(self, route):
+        last_pos = self.problem_instance.depot
+        dist = 0
+
+        for r in route:
+            v = self.problem_instance.vertices[r]
+            dist += v.distance_to(last_pos)
+            last_pos = v
+
+        return dist
 
 
 class VariableNeighbourhoodSearch:

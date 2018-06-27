@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from os import listdir
 
-from evrptw_meta import VariableNeighbourhoodSearch
+from evrptw_meta import VariableNeighbourhoodSearch, SimulatedAnnealing
 from evrptw_solver import EVRPTWSolver
 from evrptw_utilities import load_problem_instance, load_solution, write_solution_to_file, write_solution_stats_to_file
 from heuristics.construction.beasley_heuristic import BeasleyHeuristic, k_nearest_neighbor_min_due_date, \
@@ -64,13 +64,15 @@ def main():
             problem_instance = load_problem_instance('_problem_instances/exercise_instances/' + file)
             distance, solution = load_solution('_problem_solutions/solution_{0}'.format(file))
 
-            meta_heuristic = VariableNeighbourhoodSearch(problem_instance, solution, distance)
+            meta_heuristic = SimulatedAnnealing(problem_instance, solution, distance, 1, 0.9)
 
             print('start to improve the routes...')
-            distance, solution = meta_heuristic.improve_solution()
+            new_distance, new_solution = meta_heuristic.improve_solution()
+
+            print('solution improved by {0}'.format(distance - new_distance))
 
             print("write results to file...")
-            write_solution_to_file("_meta_solutions/solution_{0}".format(file),distance, solution)
+            write_solution_to_file("_meta_solutions/solution_{0}".format(file), new_distance, new_solution)
             print()
 
     print("done")
