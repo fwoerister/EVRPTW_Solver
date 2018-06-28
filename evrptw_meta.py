@@ -166,7 +166,7 @@ class SimulatedAnnealing:
         self.cooling_factor = cooling_factor
         self.rep = rep
 
-        self.neighbour_hoods = [merge_route, two_opt, two_opt_star, or_opt, cross_exchange]
+        self.neighbour_hoods = [merge_route, two_opt, two_opt_star]  # , or_opt, cross_exchange]
 
     def improve_solution(self):
         state_approx = self.state
@@ -176,7 +176,7 @@ class SimulatedAnnealing:
             self.temp = self.t_0
             current_state = state_approx
             current_distances = distance_approx
-            while self.temp > 0.00000000001:
+            while self.temp > 0.0000000001:
                 random_neighbour, random_distances = self.get_random_feasible_neighbour(current_state,
                                                                                         current_distances,
                                                                                         iteration)
@@ -188,7 +188,6 @@ class SimulatedAnnealing:
                     current_distances = random_distances
 
                     if sum(distance_approx) > sum(current_distances):
-                        # current_state, current_distances = self.local_search(random_neighbour, random_distances)
                         state_approx = current_state
                         distance_approx = current_distances
                 else:
@@ -201,7 +200,6 @@ class SimulatedAnnealing:
                 self.temp *= self.cooling_factor
                 iteration += 1
 
-        print('do local search on best solution')
         state_approx, distance_approx = self.local_search(state_approx, distance_approx)
         return sum(distance_approx), state_approx
 

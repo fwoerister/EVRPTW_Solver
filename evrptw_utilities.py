@@ -1,5 +1,6 @@
 from evrptw_solver import RoutingProblemInstance, RoutingProblemConfiguration, Route
 from targets import Target, CharingStation, Customer
+import numpy as np
 import matplotlib.pyplot as plt
 
 
@@ -103,3 +104,18 @@ def write_solution_stats_to_file(file, stat, style='csv'):
             result_file.write("\\bottomrule \n")
             result_file.write("\\end{tabular} \n")
             result_file.write("\\end{table} \n")
+
+
+def write_meta_heuristic_result_statistic_to_file(file, dist_stat, time_stat):
+    with open(file, 'w') as f:
+        f.writelines('file;distance(avg);distance(std);distance(min);time(avg);time(std);time(max)\n')
+
+        instances = list(dist_stat.keys())
+        instances.sort()
+
+        for i in instances:
+            f.writelines(
+                '{0};{1};{2};{3};{4};{5};{6}\n'.format(i, np.average(dist_stat[i]), np.std(dist_stat[i]),
+                                                     np.min(dist_stat[i]),
+                                                     np.average(time_stat[i]), np.std(time_stat[i]),
+                                                     np.max(time_stat[i])))

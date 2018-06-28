@@ -6,13 +6,16 @@ from os import listdir
 
 from evrptw_meta import VariableNeighbourhoodSearch, SimulatedAnnealing
 from evrptw_solver import EVRPTWSolver
-from evrptw_utilities import load_problem_instance, load_solution, write_solution_to_file, write_solution_stats_to_file
+from evrptw_utilities import load_problem_instance, load_solution, write_solution_to_file, write_solution_stats_to_file, \
+    write_meta_heuristic_result_statistic_to_file
 from heuristics.construction.beasley_heuristic import BeasleyHeuristic, k_nearest_neighbor_min_due_date, \
     k_nearest_neighbor_min_ready_time, nearest_neighbor_tolerance_min_due_date, \
     nearest_neighbor_tolerance_min_ready_time
 
 RESULT_STATISTICS_FILENAME = 'ex1_result_1126205.csv'
 RESULT_STATISTICS_LATEX_TABLE = 'ex1_result_1126205.tex'
+
+MAX_ITERATIONS = 5
 
 
 def main():
@@ -58,22 +61,35 @@ def main():
     print("============================================")
     print()
 
+    dist_statistic = dict()
+    time_statistic = dict()
+
     for file in listdir('_problem_instances/exercise_instances/'):
         if file.endswith('.txt'):
             print("process file {0}".format(file))
             problem_instance = load_problem_instance('_problem_instances/exercise_instances/' + file)
             distance, solution = load_solution('_problem_solutions/solution_{0}'.format(file))
 
-            meta_heuristic = SimulatedAnnealing(problem_instance, solution, distance, 1, 0.9)
-
             print('start to improve the routes...')
-            new_distance, new_solution = meta_heuristic.improve_solution()
 
-            print('solution improved by {0}'.format(distance - new_distance))
+            dist_statistic[file] = []
+            time_statistic[file] = []
+            for i in range(0, MAX_ITERATIONS):
+                meta_heuristic = SimulatedAnnealing(problem_instance, solution, distance, 1, 0.9)
+                new_distance, new_solution = meta_heuristic.improve_solution()
+
+                duration = timeit.timeit(meta_heuristic.improve_solution, number=1)
+
+                time_statistic[file].append(duration)
+                dist_statistic[file].append(new_distance)
+
+                print('solution improved by {0}'.format(distance - new_distance))
 
             print("write results to file...")
-            write_solution_to_file("_meta_solutions/solution_{0}".format(file), new_distance, new_solution)
+            write_solution_to_file("_meta_solutions/solution_{0}_{1}".format(i, file), new_distance, new_solution)
             print()
+
+    write_meta_heuristic_result_statistic_to_file('meta_heuristic_results.csv',dist_statistic,time_statistic)
 
     print("done")
 
