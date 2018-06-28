@@ -8,6 +8,8 @@ from targets import Customer, CharingStation
 
 from itertools import combinations, product
 
+import matplotlib.pyplot as plt
+
 import sys
 
 K_MAX = 4
@@ -155,7 +157,7 @@ def merge_route(state, distances, feasibility_operator, route_length_operator, m
 
 
 class SimulatedAnnealing:
-    def __init__(self, problem_instance: RoutingProblemInstance, state, distances, t_0, cooling_factor, rep=1):
+    def __init__(self, problem_instance: RoutingProblemInstance, state, distances, t_0, cooling_factor, fig_name, rep=1):
         self.problem_instance = problem_instance
         self.state = state
         self.distances = list()
@@ -166,24 +168,28 @@ class SimulatedAnnealing:
         self.cooling_factor = cooling_factor
         self.rep = rep
 
+        self.fig_name = fig_name
         self.neighbour_hoods = [merge_route, two_opt, two_opt_star]  # , or_opt, cross_exchange]
 
     def improve_solution(self):
         state_approx = self.state
         distance_approx = self.distances
         iteration = 0
+
         for r in range(0, self.rep):
             self.temp = self.t_0
+            statistic = []
+            temps = []
             current_state = state_approx
             current_distances = distance_approx
-            while self.temp > 0.0000000001:
+            while iteration < 1000: # 0.0000000000001:
                 random_neighbour, random_distances = self.get_random_feasible_neighbour(current_state,
                                                                                         current_distances,
                                                                                         iteration)
 
                 delta = (sum(random_distances) - sum(current_distances)) / sum(current_distances)
 
-                if delta < 0:
+                if delta <= 0:
                     current_state = random_neighbour
                     current_distances = random_distances
 
@@ -192,13 +198,22 @@ class SimulatedAnnealing:
                         distance_approx = current_distances
                 else:
                     random_number = random()
-
+                    # print(delta)
                     if random_number < exp(-1 * delta / self.temp):
                         current_state = random_neighbour
                         current_distances = random_distances
 
+                statistic.append(sum(current_distances))
+                temps.append(self.temp)
                 self.temp *= self.cooling_factor
                 iteration += 1
+
+        plt.clf()
+        plt.title('Instance {0}'.format(self.fig_name))
+        plt.xlabel('iterations')
+        plt.ylabel('distance')
+        plt.plot(statistic)
+        plt.savefig('figures/{0}.png'.format(self.fig_name))
 
         state_approx, distance_approx = self.local_search(state_approx, distance_approx)
         return sum(distance_approx), state_approx
@@ -208,7 +223,7 @@ class SimulatedAnnealing:
         next_distances = distances
 
         for nh_op in self.neighbour_hoods:
-            if choice([True, False]):
+            if choice([True]):
                 next_state, next_distances = nh_op(next_state, next_distances, self.is_feasible,
                                                    self.calculate_route_distance)
 

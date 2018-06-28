@@ -15,7 +15,7 @@ from heuristics.construction.beasley_heuristic import BeasleyHeuristic, k_neares
 RESULT_STATISTICS_FILENAME = 'ex1_result_1126205.csv'
 RESULT_STATISTICS_LATEX_TABLE = 'ex1_result_1126205.tex'
 
-MAX_ITERATIONS = 5
+MAX_ITERATIONS = 10
 
 
 def main():
@@ -66,6 +66,7 @@ def main():
 
     for file in listdir('_problem_instances/exercise_instances/'):
         if file.endswith('.txt'):
+
             print("process file {0}".format(file))
             problem_instance = load_problem_instance('_problem_instances/exercise_instances/' + file)
             distance, solution = load_solution('_problem_solutions/solution_{0}'.format(file))
@@ -75,7 +76,7 @@ def main():
             dist_statistic[file] = []
             time_statistic[file] = []
             for i in range(0, MAX_ITERATIONS):
-                meta_heuristic = SimulatedAnnealing(problem_instance, solution, distance, 1, 0.9)
+                meta_heuristic = SimulatedAnnealing(problem_instance, solution, distance, 0.5, 0.8, '{0}_{1}'.format(file,i))
                 new_distance, new_solution = meta_heuristic.improve_solution()
 
                 duration = timeit.timeit(meta_heuristic.improve_solution, number=1)
